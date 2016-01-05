@@ -106,9 +106,37 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 		<cfquery name="qList" datasource="#variables.dsn#" username="#variables.dsnusername#" password="#variables.dsnpassword#">
 			SELECT
-				tcontent.contentID,tcontent.contentHistID,tcontent.filename,tcontent.lastupdate,tcontent.lastupdate,attributeValue AS isExclude,tcontent.path
+				tcontent.contentID,
+				tcontent.contentHistID,
+				tcontent.filename,
+				tcontent.lastupdate,
+				tcontent.lastupdate,
+				attributeValue AS isExclude,
+				tcontent.path
 			FROM
 				tcontent
+			INNER JOIN
+				tcontent AS parentContent
+			    ON
+				(
+			        tcontent.ParentID = parentContent.contentID
+					AND
+						parentContent.siteid = <cfqueryparam value="#useSiteID#" cfsqltype="cf_sql_varchar" maxlength="25">
+					AND
+						parentContent.approved = 1
+					AND
+						parentContent.active = 1
+					AND
+					(
+					parentContent.display = 1
+					OR
+						(
+							parentContent.display = 2
+							AND
+							parentContent.displaystart <= CURDATE()
+						)
+					)
+			    )
 			JOIN
 				tclassextend
 				ON
@@ -167,6 +195,61 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 						</cfif>
 					)
 				)
+
+		UNION
+
+			SELECT
+				tcontent.contentID,
+				tcontent.contentHistID,
+				tcontent.filename,
+				tcontent.lastupdate,
+				tcontent.lastupdate,
+				attributeValue AS isExclude,
+				tcontent.path
+			FROM
+				tcontent
+			JOIN
+				tclassextend
+				ON
+					tclassextend.siteID = <cfqueryparam value="#useSiteID#" cfsqltype="cf_sql_varchar" maxlength="25">
+				AND
+					tcontent.type = tclassextend.type
+				AND
+					tclassextend.subtype = 'Default'
+			JOIN
+				tclassextendsets
+				ON
+					tclassextend.subTypeID = tclassextendsets.subTypeID
+			JOIN
+				tclassextendattributes
+				ON
+					tclassextendsets.extendsetID = tclassextendattributes.extendsetID
+				AND
+					tclassextendattributes.name = 'exclude'
+			LEFT JOIN
+				tclassextenddata
+				ON
+					tclassextendattributes.attributeID = tclassextenddata.attributeID
+				AND
+					tclassextenddata.baseID = tcontent.contentHistID
+			WHERE
+				tcontent.siteid = <cfqueryparam value="#useSiteID#" cfsqltype="cf_sql_varchar" maxlength="25">
+			AND
+				tcontent.approved = 1
+			AND
+				tcontent.active = 1
+			AND
+				(
+				tcontent.display = 1
+				OR
+					(
+						tcontent.display = 2
+						AND
+						tcontent.displaystart <= CURDATE()
+					)
+				)
+			AND
+				tcontent.contentID = '00000000000000000000000000000000001'
 		</cfquery>
 
 		<cfloop query="qList">
